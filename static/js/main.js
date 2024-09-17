@@ -113,6 +113,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('File upload response:', data);
                 hideTypingIndicator();
                 addMessage(`File uploaded: ${data.file_url}`, true);
+                if (file.name.toLowerCase().endsWith('.pdf')) {
+                    addMessage("PDF uploaded successfully. You can now ask questions about its content.", false);
+                }
             })
             .catch(error => {
                 console.error('Error uploading file:', error);

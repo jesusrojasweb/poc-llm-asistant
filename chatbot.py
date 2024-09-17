@@ -1,52 +1,59 @@
 import os
 from openai import OpenAI
-from typing import List, Dict
+from openai.types.beta import Assistant
+from openai.types.beta.thread import Thread
+from openai.types.beta.threads.thread_message import ThreadMessage
 
-# Initialize the OpenAI client
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-# Initialize conversation history
-conversation_history: List[Dict[str, str]] = []
+assistant: Assistant = None
+thread: Thread = None
 
-def initialize_conversation(initial_history: List[Dict[str, str]]):
-    global conversation_history
-    conversation_history = initial_history[-20:]  # Keep only the last 20 messages
+def initialize_assistant():
+    global assistant
+    assistant = client.beta.assistants.create(
+        name="PDF Assistant",
+        instructions="You are a helpful assistant that can answer questions based on uploaded PDF documents.",
+        model="gpt-4-1106-preview"
+    )
 
-def get_chatbot_response(user_input: str) -> str:
-    global conversation_history
+def create_thread():
+    global thread
+    thread = client.beta.threads.create()
 
-    # Add user input to conversation history
-    conversation_history.append({"role": "user", "content": user_input})
+def get_chatbot_response(user_message: str) -> str:
+    global thread
+    if thread is None:
+        create_thread()
 
-    # Prepare messages for the API call
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant with a good memory. You can recall and reference previous parts of the conversation."},
-    ] + conversation_history
+    message = client.beta.threads.messages.create(
+        thread_id=thread.id,
+        role="user",
+        content=user_message
+    )
 
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=messages,
-            max_tokens=150,
-            n=1,
-            stop=None,
-            temperature=0.7
-        )
-        
-        bot_response = response.choices[0].message.content.strip()
-        
-        # Add bot response to conversation history
-        conversation_history.append({"role": "assistant", "content": bot_response})
-        
-        # Trim conversation history to last 20 messages to manage token usage
-        if len(conversation_history) > 20:
-            conversation_history = conversation_history[-20:]
-        
-        return bot_response
-    except Exception as e:
-        print(f"Error in getting chatbot response: {e}")
-        return "I apologize, but I'm having trouble processing your request at the moment. Could you please try again?"
+    run = client.beta.threads.runs.create(
+        thread_id=thread.id,
+        assistant_id=assistant.id
+    )
+
+    while run.status != "completed":
+        run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
+
+    messages = client.beta.threads.messages.list(thread_id=thread.id)
+    return messages.data[0].content[0].text.value
 
 def reset_conversation():
-    global conversation_history
-    conversation_history = []
+    global thread
+    thread = None
+    create_thread()
+
+def upload_pdf(file_path: str):
+    file = client.files.create(
+        file=open(file_path, "rb"),
+        purpose="assistants"
+    )
+    client.beta.assistants.files.create(assistant_id=assistant.id, file_id=file.id)
+
+# Initialize the assistant when the module is imported
+initialize_assistant()

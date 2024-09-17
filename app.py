@@ -5,7 +5,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from models import db, ChatMessage, User
-from chatbot import initialize_conversation, get_chatbot_response, reset_conversation
+from chatbot import initialize_conversation, get_chatbot_response, reset_conversation, upload_pdf
 from datetime import timedelta
 from flask_socketio import SocketIO, emit
 
@@ -184,6 +184,10 @@ def upload_file():
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
         file_url = f"/uploads/{filename}"
+        
+        # Upload PDF to OpenAI Assistant
+        if filename.lower().endswith('.pdf'):
+            upload_pdf(file_path)
         
         # Save file message to database
         file_message = ChatMessage(content=f"File uploaded: {file_url}", is_user=True, user_id=current_user.id)
