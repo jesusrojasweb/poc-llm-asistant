@@ -7,6 +7,7 @@ from flask_login import LoginManager, login_user, login_required, logout_user, c
 from models import db, ChatMessage, User
 from chatbot import initialize_conversation, get_chatbot_response, reset_conversation
 from datetime import timedelta
+from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'qLiAAc92kN98OojsXFoSUvSQZuSw9Jiq')
@@ -26,6 +27,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_NAME'] = 'my_session_cookie'
 
 db.init_app(app)
+socketio = SocketIO(app)
 
 # Flask-Login configuration
 login_manager = LoginManager()
@@ -140,10 +142,9 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-@app.route('/chat', methods=['POST'])
-@login_required
-def chat():
-    user_message = request.json['message']
+@socketio.on('send_message')
+def handle_message(data):
+    user_message = data['message']
     
     # Save user message to database
     chat_message = ChatMessage(content=user_message, is_user=True, user_id=current_user.id)
@@ -158,15 +159,15 @@ def chat():
     db.session.add(bot_message)
     db.session.commit()
     
-    return jsonify({'response': bot_response})
+    # Emit the response back to the client
+    emit('receive_message', {'message': bot_response, 'is_user': False})
 
-@app.route('/reset_conversation', methods=['POST'])
-@login_required
-def reset_chat():
+@socketio.on('reset_conversation')
+def handle_reset():
     reset_conversation()
     ChatMessage.query.filter_by(user_id=current_user.id).delete()
     db.session.commit()
-    return jsonify({'message': 'Conversation reset successfully'})
+    emit('conversation_reset')
 
 @app.route('/upload', methods=['POST'])
 @login_required
@@ -247,4 +248,4 @@ def init_db():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)

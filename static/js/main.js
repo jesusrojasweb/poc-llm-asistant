@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOMContentLoaded event fired');
+    const socket = io();
     const chatMessages = document.getElementById('chatMessages');
     const userInput = document.getElementById('userInput');
     const sendButton = document.getElementById('sendButton');
@@ -52,33 +53,21 @@ document.addEventListener('DOMContentLoaded', () => {
             userInput.value = '';
             showTypingIndicator();
 
-            console.log('Sending fetch request to /chat');
-            fetch('/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ message: message }),
-            })
-            .then(response => {
-                console.log('Received response:', response);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('Parsed response data:', data);
-                hideTypingIndicator();
-                addMessage(data.response, false);
-            })
-            .catch(error => {
-                console.error('Error in fetch:', error);
-                hideTypingIndicator();
-                addMessage('An error occurred. Please try again.', false);
-            });
+            socket.emit('send_message', { message: message });
         }
     }
+
+    socket.on('receive_message', (data) => {
+        console.log('Received message:', data);
+        hideTypingIndicator();
+        addMessage(data.message, data.is_user);
+    });
+
+    socket.on('conversation_reset', () => {
+        console.log('Conversation reset');
+        chatMessages.innerHTML = '';
+        addMessage("Conversation has been reset. How can I help you?", false);
+    });
 
     console.log('Attaching event listeners');
     sendButton.addEventListener('click', (e) => {
@@ -105,17 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             resetButton.classList.remove('shake');
         }, 500);
-        fetch('/reset_conversation', { method: 'POST' })
-            .then(response => response.json())
-            .then(data => {
-                console.log('Reset conversation response:', data);
-                chatMessages.innerHTML = '';
-                addMessage("Conversation has been reset. How can I help you?", false);
-            })
-            .catch(error => {
-                console.error('Error resetting conversation:', error);
-                addMessage('An error occurred while resetting the conversation. Please try again.', false);
-            });
+        socket.emit('reset_conversation');
     });
 
     fileInput.addEventListener('change', (e) => {
@@ -142,4 +121,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     });
+
+    // Load chat history
+    fetch('/history')
+        .then(response => response.json())
+        .then(history => {
+            history.forEach(msg => addMessage(msg.content, msg.is_user));
+        })
+        .catch(error => {
+            console.error('Error loading chat history:', error);
+        });
 });
