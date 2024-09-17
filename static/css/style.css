@@ -6,7 +6,7 @@ body {
     color: #ffffff;
 }
 
-.chat-container {
+.chat-container, .auth-container {
     max-width: 800px;
     margin: 0 auto;
     padding: 20px;
@@ -78,4 +78,71 @@ body {
 
 .file-input-label i {
     margin-right: 5px;
+}
+
+.auth-container {
+    max-width: 400px;
+    margin: 100px auto;
+    padding: 20px;
+    background-color: #2a2a2a;
+    border-radius: 5px;
+}
+
+.auth-container h2 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.auth-container form {
+    display: flex;
+    flex-direction: column;
+}
+
+.auth-container input {
+    margin-bottom: 10px;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    background-color: #3a3a3a;
+    color: #ffffff;
+}
+
+.auth-container button {
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    background-color: #4CAF50;
+    color: white;
+    cursor: pointer;
+}
+
+.auth-container p {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.auth-container a {
+    color: #4CAF50;
+    text-decoration: none;
+}
+
+.flash-message {
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 5px;
+}
+
+.flash-message.error {
+    background-color: #ffcccc;
+    color: #cc0000;
+}
+
+.flash-message.success {
+    background-color: #ccffcc;
+    color: #006600;
+}
+
+.flash-message.info {
+    background-color: #e6f3ff;
+    color: #0066cc;
 }

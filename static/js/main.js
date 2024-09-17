@@ -5,6 +5,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('fileInput');
     const resetButton = document.getElementById('resetButton');
 
+    if (!chatMessages || !userInput || !sendButton || !fileInput || !resetButton) {
+        // User is not logged in, so we don't need to set up the chat functionality
+        return;
+    }
+
     function addMessage(content, isUser) {
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message');

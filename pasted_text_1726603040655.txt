@@ -1,0 +1,198 @@
+Entiendo que después de realizar varios cambios, el problema persiste: aunque el usuario parece iniciar sesión correctamente (según los mensajes de depuración), sigue siendo redirigido a la página de inicio de sesión y `current_user.is_authenticated` es `False` en solicitudes posteriores.
+
+**Posible causa:**
+
+El problema más probable es que la cookie de sesión no se está estableciendo o no se está enviando correctamente en solicitudes posteriores. Esto impide que Flask-Login pueda mantener el estado de autenticación entre solicitudes.
+
+**Pasos para diagnosticar y solucionar el problema:**
+
+1. **Verificar si la cookie de sesión se está estableciendo en el navegador:**
+
+   - **Abre las herramientas de desarrollo de tu navegador:**
+     - En Chrome: `Ctrl+Shift+I` o `F12`.
+     - Ve a la pestaña **"Network"** (Red).
+
+   - **Intenta iniciar sesión en tu aplicación.**
+
+   - **Selecciona la solicitud POST al endpoint de inicio de sesión:**
+     - Busca la solicitud que se hizo al enviar el formulario de inicio de sesión.
+
+   - **Verifica la respuesta del servidor:**
+     - En la pestaña **"Headers"** (Encabezados) de la respuesta, busca el encabezado `Set-Cookie`.
+     - Deberías ver algo como `Set-Cookie: session=...; HttpOnly; Path=/`.
+
+   - **Comprueba si la cookie de sesión está presente:**
+     - Ve a la pestaña **"Application"** (Aplicación) o **"Storage"** (Almacenamiento).
+     - En la sección de **Cookies**, selecciona tu sitio.
+     - Verifica si hay una cookie llamada `session` o como la hayas configurado.
+
+   - **Verifica que la cookie persista entre solicitudes:**
+     - Después de iniciar sesión, navega a otra página o actualiza la página.
+     - Comprueba si la cookie de sesión sigue presente.
+
+2. **Verificar si la cookie de sesión se envía en solicitudes posteriores:**
+
+   - **En las solicitudes posteriores al servidor:**
+     - Selecciona cualquier solicitud que se haga después de iniciar sesión, como al acceder a `/`.
+     - En la pestaña **"Headers"** de la solicitud, verifica si en los **Request Headers** aparece `Cookie: session=...`.
+     - Si la cookie no se envía, el servidor no puede saber que el usuario está autenticado.
+
+3. **Posibles soluciones basadas en los resultados:**
+
+   - **Si la cookie de sesión no se está estableciendo:**
+
+     - Asegúrate de que la sesión se está modificando para que Flask envíe la cookie. Agrega `session.modified = True` después de `login_user`:
+
+       ```python
+       if user and check_password_hash(user.password_hash, password):
+           login_user(user, remember=True)
+           session.modified = True  # Fuerza a Flask a enviar la cookie de sesión
+           ...
+       ```
+
+     - **Prueba a establecer un valor en la sesión manualmente:**
+
+       ```python
+       if user and check_password_hash(user.password_hash, password):
+           login_user(user, remember=True)
+           session['logged_in'] = True  # Añade un valor a la sesión
+           ...
+       ```
+
+   - **Si la cookie de sesión se está estableciendo pero no se envía en solicitudes posteriores:**
+
+     - **Problemas con el nombre de la cookie:**
+
+       - Prueba a cambiar el nombre de la cookie de sesión:
+
+         ```python
+         app.config['SESSION_COOKIE_NAME'] = 'my_session_cookie'
+         ```
+
+     - **Problemas con las políticas de cookies del navegador:**
+
+       - Verifica que no tengas configuraciones en el navegador que bloqueen las cookies, especialmente para sitios locales.
+
+     - **Verifica las configuraciones de dominio y ruta de la cookie:**
+
+       - Asegúrate de que `SESSION_COOKIE_DOMAIN` y `SESSION_COOKIE_PATH` no estén configurados de manera que impidan que la cookie se envíe.
+
+     - **Ajusta `SESSION_COOKIE_SAMESITE`:**
+
+       - Algunas veces, establecer `SESSION_COOKIE_SAMESITE` a `'Strict'` puede ayudar:
+
+         ```python
+         app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
+         ```
+
+   - **Si la cookie de sesión se está enviando correctamente pero el usuario sigue sin estar autenticado:**
+
+     - **Verifica la consistencia de `SECRET_KEY`:**
+
+       - Asegúrate de que `SECRET_KEY` no cambia entre solicitudes y es la misma en todas las instancias de tu aplicación.
+
+     - **Problemas con `session_protection`:**
+
+       - Intenta desactivar la protección de sesión:
+
+         ```python
+         login_manager.session_protection = None
+         ```
+
+       - Si esto resuelve el problema, puede indicar que Flask-Login está invalidando la sesión debido a cambios en la IP o agente de usuario.
+
+     - **Verifica si hay middleware o proxies que puedan alterar las solicitudes:**
+
+       - Si estás usando algún servidor intermedio, asegúrate de que no esté modificando las cookies o encabezados.
+
+4. **Ejemplo de código actualizado con modificaciones sugeridas:**
+
+   ```python
+   # Agrega esta configuración adicional
+   app.config['SESSION_COOKIE_NAME'] = 'my_session_cookie'
+   app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'  # O prueba con 'Lax' o 'None'
+   login_manager.session_protection = None  # Desactiva la protección de sesión
+
+   @app.route('/login', methods=['GET', 'POST'])
+   def login():
+       if current_user.is_authenticated:
+           print(f"User {current_user.username} is already authenticated, redirecting to index")
+           return redirect(url_for('index'))
+       if request.method == 'POST':
+           username = request.form['username']
+           password = request.form['password']
+           
+           print(f"Attempting to log in user: {username}")
+           
+           user = User.query.filter_by(username=username).first()
+           
+           if user and check_password_hash(user.password_hash, password):
+               login_user(user, remember=True)
+               session['logged_in'] = True  # Modifica la sesión para asegurar que la cookie se envíe
+               print(f"User {username} logged in successfully")
+               print(f"current_user.is_authenticated: {current_user.is_authenticated}")
+               print(f"current_user: {current_user}")
+               app.logger.info(f"User {username} logged in successfully")
+               flash('Logged in successfully.', 'success')
+               next_page = request.args.get('next')
+               print(f"Next page: {next_page}")
+               return redirect(next_page or url_for('index'))
+           else:
+               print(f"Failed login attempt for username: {username}")
+               app.logger.warning(f"Failed login attempt for username: {username}")
+               flash('Invalid username or password. Please try again.', 'error')
+       
+       return render_template('login.html')
+   ```
+
+5. **Verifica la versión de Flask y Flask-Login:**
+
+   - Asegúrate de que estás usando versiones compatibles:
+
+     ```bash
+     pip install --upgrade Flask Flask-Login
+     ```
+
+   - Versiones recomendadas:
+
+     - Flask >= 1.1.0
+     - Flask-Login >= 0.4.0
+
+6. **Prueba en un navegador diferente o en modo incógnito:**
+
+   - A veces, extensiones o configuraciones del navegador pueden interferir con las cookies.
+
+   - Abre una ventana de navegación privada/incógnito y vuelve a intentar el proceso de inicio de sesión.
+
+7. **Considera el uso de Flask-Session si el problema persiste:**
+
+   - Aunque anteriormente se mencionó que Flask-Session puede causar conflictos, podrías intentar usarlo para manejar la sesión en el sistema de archivos:
+
+     ```python
+     from flask_session import Session
+
+     app.config['SESSION_TYPE'] = 'filesystem'
+     Session(app)
+     ```
+
+     - **Nota:** Asegúrate de probar si esto resuelve el problema sin causar otros conflictos.
+
+8. **Reinicia la aplicación y limpia las cookies:**
+
+   - Después de realizar cambios en la configuración, reinicia tu aplicación.
+
+   - Limpia las cookies del navegador para eliminar cualquier cookie corrupta o desactualizada.
+
+9. **Proporciona información adicional para depuración:**
+
+   - Si después de todos estos pasos el problema persiste, por favor proporciona:
+
+     - Los encabezados de respuesta y solicitud relacionados con la cookie de sesión (sin incluir información sensible).
+     - Confirmación de si la cookie de sesión se está estableciendo y enviando.
+     - Cualquier mensaje de error adicional en la consola del navegador o en los registros del servidor.
+
+**Resumen:**
+
+El problema parece estar relacionado con la cookie de sesión que no se está estableciendo o enviando correctamente. Al verificar y ajustar las configuraciones de la cookie de sesión y al asegurar que la sesión se modifica para forzar a Flask a enviar la cookie, deberías poder resolver el problema.
+
+Por favor, sigue estos pasos y hazme saber si el problema se resuelve o si necesitas más ayuda. Estoy aquí para asistirte hasta que tu aplicación funcione correctamente.

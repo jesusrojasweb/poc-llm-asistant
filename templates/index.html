@@ -11,17 +11,29 @@
     <div class="chat-container">
         <div class="chat-header">
             <h1>Dark-themed Chatbot</h1>
-            <button id="resetButton">Reset Conversation</button>
+            {% if current_user.is_authenticated %}
+                <p>Welcome, {{ current_user.username }}! <a href="{{ url_for('logout') }}">Logout</a></p>
+                <button id="resetButton">Reset Conversation</button>
+            {% else %}
+                <p><a href="{{ url_for('login') }}">Login</a> or <a href="{{ url_for('register') }}">Register</a></p>
+            {% endif %}
         </div>
-        <div class="chat-messages" id="chatMessages"></div>
-        <div class="chat-input">
-            <input type="text" id="userInput" placeholder="Type your message...">
-            <button id="sendButton"><i data-feather="send"></i></button>
-            <label for="fileInput" class="file-input-label">
-                <i data-feather="paperclip"></i>
-                <input type="file" id="fileInput" style="display: none;">
-            </label>
-        </div>
+        {% if current_user.is_authenticated %}
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="chat-input">
+                <input type="text" id="userInput" placeholder="Type your message...">
+                <button id="sendButton"><i data-feather="send"></i></button>
+                <label for="fileInput" class="file-input-label">
+                    <i data-feather="paperclip"></i>
+                    <input type="file" id="fileInput" style="display: none;">
+                </label>
+            </div>
+        {% else %}
+            <div class="auth-container">
+                <h2>Welcome to Dark-themed Chatbot</h2>
+                <p>Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('register') }}">register</a> to start chatting.</p>
+            </div>
+        {% endif %}
     </div>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script>

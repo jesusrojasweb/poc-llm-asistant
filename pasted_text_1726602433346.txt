@@ -1,0 +1,244 @@
+Entiendo que el problema persiste incluso después de los cambios anteriores. Cuando intentas iniciar sesión, el sistema registra que el usuario ha iniciado sesión exitosamente, pero luego te redirige nuevamente a la página de inicio de sesión y `current_user.is_authenticated` sigue siendo `False`.
+
+**Posibles causas y soluciones:**
+
+1. **La cookie de sesión no se está estableciendo correctamente:**
+
+   Es posible que la cookie de sesión que mantiene la autenticación no se esté enviando o almacenando correctamente en el navegador.
+
+   **Acciones:**
+
+   - **Verifica si la cookie de sesión se está estableciendo en el navegador:**
+
+     - Abre las herramientas de desarrollo de tu navegador (normalmente con F12).
+     - Ve a la pestaña de "Application" (en Chrome) o "Storage" (en Firefox).
+     - En la sección de cookies, verifica si hay una cookie de sesión establecida para tu aplicación después de intentar iniciar sesión.
+     - Si no hay ninguna cookie, o si la cookie no persiste entre solicitudes, esto indica un problema.
+
+   - **Revisa las configuraciones relacionadas con las cookies en Flask:**
+
+     Asegúrate de que las configuraciones de las cookies no estén interfiriendo con el funcionamiento normal.
+
+     ```python
+     app.config['SESSION_COOKIE_SECURE'] = False  # Cambia a True si usas HTTPS
+     app.config['SESSION_COOKIE_HTTPONLY'] = True
+     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+     ```
+
+     Si estás probando localmente sin HTTPS, `SESSION_COOKIE_SECURE` debe ser `False`.
+
+2. **El uso del reloader en modo debug está causando problemas:**
+
+   Cuando ejecutas tu aplicación Flask en modo debug con el reloader activado, puede iniciar múltiples procesos que no comparten la misma sesión, lo que causa problemas con la autenticación.
+
+   **Acciones:**
+
+   - **Ejecuta tu aplicación sin el reloader:**
+
+     Modifica la forma en que ejecutas la aplicación para desactivar el reloader.
+
+     ```python
+     if __name__ == '__main__':
+         with app.app_context():
+             db.create_all()
+         app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+     ```
+
+     Asegúrate de que `debug` esté en `False` y `use_reloader` también en `False`.
+
+   - **Evita reiniciar la aplicación entre solicitudes:**
+
+     Si tu aplicación se reinicia entre solicitudes, la clave secreta y otros estados pueden perderse, lo que afecta a la autenticación.
+
+3. **Problemas con `session.permanent` y la vida útil de la sesión:**
+
+   La forma en que manejas la sesión y su duración puede estar afectando la persistencia de la autenticación.
+
+   **Acciones:**
+
+   - **Establece la sesión como permanente y define la duración de la sesión:**
+
+     ```python
+     @app.before_request
+     def make_session_permanent():
+         session.permanent = True
+         app.permanent_session_lifetime = timedelta(days=14)
+     ```
+
+     Esto asegurará que la sesión sea permanente y tenga una duración definida.
+
+4. **Verifica el estado de `current_user` después de `login_user`:**
+
+   Es posible que `current_user` no se esté actualizando correctamente después de llamar a `login_user`.
+
+   **Acciones:**
+
+   - **Añade declaraciones de impresión para depurar:**
+
+     En tu función de inicio de sesión, después de llamar a `login_user`, imprime el estado de `current_user.is_authenticated` y `current_user`:
+
+     ```python
+     if user and check_password_hash(user.password_hash, password):
+         login_user(user, remember=True)
+         print(f"User {username} logged in successfully")
+         print(f"current_user.is_authenticated: {current_user.is_authenticated}")
+         print(f"current_user: {current_user}")
+         app.logger.info(f"User {username} logged in successfully")
+         flash('Logged in successfully.', 'success')
+         next_page = request.args.get('next')
+         return redirect(next_page or url_for('index'))
+     ```
+
+     Esto te ayudará a ver si `current_user` se está actualizando correctamente en el contexto de la solicitud.
+
+5. **Problemas con la configuración de la aplicación y el entorno:**
+
+   A veces, variables de entorno o configuraciones erróneas pueden causar este tipo de problemas.
+
+   **Acciones:**
+
+   - **Asegúrate de que `SECRET_KEY` es constante y estática:**
+
+     Ya que ya estableciste una clave secreta fija, verifica nuevamente que no esté cambiando entre solicitudes.
+
+   - **Verifica que no haya conflictos con otros paquetes o configuraciones:**
+
+     Asegúrate de que no haya otros paquetes o extensiones que estén interfiriendo con la sesión o la autenticación.
+
+6. **Prueba en un entorno minimalista:**
+
+   Para aislar el problema, podrías crear una aplicación Flask mínima con autenticación básica para ver si el problema persiste.
+
+   **Acciones:**
+
+   - **Crea una pequeña aplicación de prueba:**
+
+     ```python
+     from flask import Flask, render_template, redirect, url_for, request
+     from flask_sqlalchemy import SQLAlchemy
+     from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+     import os
+
+     app = Flask(__name__)
+     app.config['SECRET_KEY'] = 'mi-clave-secreta-predeterminada'
+     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
+     db = SQLAlchemy(app)
+
+     login_manager = LoginManager()
+     login_manager.init_app(app)
+     login_manager.login_view = 'login'
+
+     class User(db.Model, UserMixin):
+         id = db.Column(db.Integer, primary_key=True)
+         username = db.Column(db.String(150), nullable=False, unique=True)
+         password = db.Column(db.String(150), nullable=False)
+
+     @login_manager.user_loader
+     def load_user(user_id):
+         return User.query.get(int(user_id))
+
+     @app.route('/login', methods=['GET', 'POST'])
+     def login():
+         if request.method == 'POST':
+             username = request.form['username']
+             user = User.query.filter_by(username=username).first()
+             if user:
+                 login_user(user)
+                 return redirect(url_for('dashboard'))
+         return render_template('login.html')
+
+     @app.route('/dashboard')
+     @login_required
+     def dashboard():
+         return f'Logged in as: {current_user.username}'
+
+     if __name__ == '__main__':
+         db.create_all()
+         app.run(debug=False)
+     ```
+
+     - **Prueba si puedes iniciar sesión correctamente en esta aplicación minimalista.**
+
+     - Si funciona, entonces el problema está en alguna parte específica de tu aplicación original.
+
+7. **Verifica si hay conflictos con las versiones de las librerías:**
+
+   A veces, incompatibilidades entre versiones pueden causar comportamientos inesperados.
+
+   **Acciones:**
+
+   - **Revisa las versiones de Flask y Flask-Login:**
+
+     Asegúrate de que estás usando versiones compatibles.
+
+     - Flask >= 1.0.0
+     - Flask-Login >= 0.4.0
+
+   - **Actualiza las librerías si es necesario:**
+
+     ```bash
+     pip install --upgrade Flask Flask-Login
+     ```
+
+8. **Verifica la configuración de tu base de datos y modelos:**
+
+   Aunque es menos probable, un problema en el modelo del usuario o en cómo se guarda puede afectar la autenticación.
+
+   **Acciones:**
+
+   - **Asegúrate de que el modelo `User` implementa correctamente `UserMixin`:**
+
+     Ya que estás usando `UserMixin`, verifica que no haya conflictos.
+
+   - **Verifica que el `user_id` sea correcto:**
+
+     Asegúrate de que el `user_id` que se almacena en la sesión corresponde al usuario correcto.
+
+9. **Considera el entorno de despliegue:**
+
+   Si estás ejecutando la aplicación en un entorno que tiene balanceadores de carga o servidores proxy, podrían afectar las cookies y sesiones.
+
+   **Acciones:**
+
+   - **Prueba ejecutar la aplicación localmente sin ningún intermediario:**
+
+     Esto ayudará a aislar si el problema es causado por el entorno.
+
+10. **Verifica las rutas y redirecciones:**
+
+    Es posible que haya un error en cómo se manejan las redirecciones después del inicio de sesión.
+
+    **Acciones:**
+
+    - **Imprime el valor de `next_page`:**
+
+      Antes de redirigir, imprime `next_page` para ver a dónde está intentando redirigir.
+
+      ```python
+      next_page = request.args.get('next')
+      print(f"Next page: {next_page}")
+      ```
+
+    - **Asegúrate de que `next_page` no te está redirigiendo de vuelta a la página de inicio de sesión debido a algún error.**
+
+    - **Modifica temporalmente la redirección para siempre ir al índice:**
+
+      ```python
+      return redirect(url_for('index'))
+      ```
+
+      Esto eliminará la variable `next_page` de la ecuación y te permitirá ver si el problema es con la redirección.
+
+**Resumen de pasos a seguir:**
+
+- **Verifica las cookies en el navegador** para asegurarte de que la cookie de sesión se está estableciendo y manteniendo entre solicitudes.
+
+- **Desactiva el reloader y el modo debug** para evitar posibles conflictos.
+
+- **Añade declaraciones de depuración** para imprimir el estado de `current_user` después de `login_user`.
+
+- **Crea una aplicación mínima** para probar la autenticación básica y aislar el problema.
+
+- **Revisa las configuraciones de la sesión y las cookies** en tu aplicación Flask.
+
+Por favor, intenta estos pasos y proporciona cualquier información adicional que puedas obtener de los mensajes de depuración o del comportamiento de la aplicación. Estoy aquí para ayudarte a resolver este problema.
