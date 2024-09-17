@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const userInput = document.getElementById('userInput');
     const sendButton = document.getElementById('sendButton');
     const fileInput = document.getElementById('fileInput');
+    const resetButton = document.getElementById('resetButton');
 
     function addMessage(content, isUser) {
         const messageDiv = document.createElement('div');
@@ -57,6 +58,18 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .catch(error => console.error('Error:', error));
         }
+    });
+
+    resetButton.addEventListener('click', () => {
+        fetch('/reset_conversation', {
+            method: 'POST',
+        })
+        .then(response => response.json())
+        .then(data => {
+            chatMessages.innerHTML = '';
+            addMessage("Conversation has been reset. How can I help you?", false);
+        })
+        .catch(error => console.error('Error:', error));
     });
 
     // Load chat history

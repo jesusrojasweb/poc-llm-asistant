@@ -3,7 +3,7 @@ from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from models import db, ChatMessage
-from chatbot import get_chatbot_response
+from chatbot import initialize_conversation, get_chatbot_response, reset_conversation
 
 app = Flask(__name__)
 
@@ -24,6 +24,9 @@ def allowed_file(filename):
 
 @app.route('/')
 def index():
+    messages = ChatMessage.query.order_by(ChatMessage.timestamp).all()
+    initial_history = [{'role': 'user' if msg.is_user else 'assistant', 'content': msg.content} for msg in messages]
+    initialize_conversation(initial_history)
     return render_template('index.html')
 
 @app.route('/chat', methods=['POST'])
@@ -44,6 +47,13 @@ def chat():
     db.session.commit()
     
     return jsonify({'response': bot_response})
+
+@app.route('/reset_conversation', methods=['POST'])
+def reset_chat():
+    reset_conversation()
+    ChatMessage.query.delete()
+    db.session.commit()
+    return jsonify({'message': 'Conversation reset successfully'})
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
