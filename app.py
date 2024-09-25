@@ -247,6 +247,19 @@ def unauthorized(error):
     flash('Please log in to access this page.', 'error')
     return redirect(url_for('login', next=request.url))
 
+@app.route('/feedback', methods=['POST'])
+@login_required
+def handle_feedback():
+    data = request.json
+    message_id = data.get('message_id')
+    is_like = data.get('is_like')
+    
+    # Here you would typically update your database
+    # For now, we'll just print the feedback
+    print(f"Feedback received: Message ID: {message_id}, Like: {is_like}")
+    
+    return jsonify({"status": "success"})
+
 def init_db():
     with app.app_context():
         db.drop_all()  # Be careful with this in production!
