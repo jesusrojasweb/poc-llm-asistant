@@ -342,3 +342,31 @@ body {
         transform: translateY(0px);
     }
 }
+
+.message-feedback {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 5px;
+}
+
+.feedback-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    margin-left: 10px;
+    opacity: 0.5;
+    transition: opacity 0.3s ease;
+}
+
+.feedback-btn:hover {
+    opacity: 1;
+}
+
+.feedback-btn.active {
+    opacity: 1;
+    color: #4CAF50;
+}
+
+.feedback-btn.active.dislike {
+    color: #f44336;
+}
