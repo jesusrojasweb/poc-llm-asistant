@@ -11,21 +11,70 @@
     <div class="admin-container">
         <h1>Admin Dashboard</h1>
         <a href="{{ url_for('index') }}" class="back-button">Back to Chat</a>
+
+        <div class="admin-summary">
+            <h2>Overall Statistics</h2>
+            <p>Total Users: {{ total_users }}</p>
+            <p>Total Messages: {{ total_messages }}</p>
+            <p>Average Messages per User: {{ "%.2f"|format(avg_messages_per_user) }}</p>
+        </div>
+
+        <div class="admin-search">
+            <form action="{{ url_for('admin') }}" method="get">
+                <input type="text" name="search" placeholder="Search users..." value="{{ search_query }}">
+                <button type="submit">Search</button>
+            </form>
+        </div>
+
         {% for data in user_data %}
             <div class="user-section">
                 <h2>User: {{ data.user.username }}</h2>
                 <p>Email: {{ data.user.email }}</p>
-                <h3>Chat History:</h3>
+                <div class="user-stats">
+                    <p>Total Messages: {{ data.total_messages }}</p>
+                    <p>Positive Feedback: {{ data.positive_feedback }}</p>
+                    <p>Negative Feedback: {{ data.negative_feedback }}</p>
+                </div>
+                <h3>Recent Chat History:</h3>
                 <div class="chat-history">
                     {% for message in data.chat_history %}
                         <div class="message {% if message.is_user %}user-message{% else %}bot-message{% endif %}">
                             <p>{{ message.content }}</p>
                             <small>{{ message.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+                            {% if not message.is_user %}
+                                <span class="feedback-indicator">
+                                    {% if message.feedback == True %}
+                                        <i data-feather="thumbs-up"></i>
+                                    {% elif message.feedback == False %}
+                                        <i data-feather="thumbs-down"></i>
+                                    {% endif %}
+                                </span>
+                            {% endif %}
                         </div>
                     {% endfor %}
                 </div>
             </div>
         {% endfor %}
+
+        <div class="pagination">
+            {% if users_pagination.has_prev %}
+                <a href="{{ url_for('admin', page=users_pagination.prev_num, search=search_query) }}">Previous</a>
+            {% endif %}
+            {% for page in users_pagination.iter_pages() %}
+                {% if page %}
+                    {% if page != users_pagination.page %}
+                        <a href="{{ url_for('admin', page=page, search=search_query) }}">{{ page }}</a>
+                    {% else %}
+                        <strong>{{ page }}</strong>
+                    {% endif %}
+                {% else %}
+                    <span>...</span>
+                {% endif %}
+            {% endfor %}
+            {% if users_pagination.has_next %}
+                <a href="{{ url_for('admin', page=users_pagination.next_num, search=search_query) }}">Next</a>
+            {% endif %}
+        </div>
     </div>
     <script>
         feather.replace();

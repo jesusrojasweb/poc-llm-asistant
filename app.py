@@ -9,20 +9,19 @@ from models import db, ChatMessage, User
 from chatbot import initialize_conversation, get_chatbot_response, reset_conversation, upload_pdf, get_vector_store_id
 from datetime import timedelta
 from flask_socketio import SocketIO, emit
+from sqlalchemy import func
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'qLiAAc92kN98OojsXFoSUvSQZuSw9Jiq')
 print(f"SECRET_KEY: {app.config['SECRET_KEY']}")
 
-# Database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL")
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace("postgres://", "postgresql://", 1)
 
-# Session configuration
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=14)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=14)
-app.config['SESSION_COOKIE_SECURE'] = False  # Change to True if using HTTPS
+app.config['SESSION_COOKIE_SECURE'] = False
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_NAME'] = 'my_session_cookie'
@@ -31,7 +30,6 @@ db.init_app(app)
 migrate = Migrate(app, db)
 socketio = SocketIO(app)
 
-# Flask-Login configuration
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.session_protection = None
@@ -42,7 +40,6 @@ login_manager.login_message_category = 'info'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# File upload configuration
 UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -123,8 +120,8 @@ def login():
 
         if user and check_password_hash(user.password_hash, password):
             login_user(user, remember=True)
-            session['logged_in'] = True  # Modify session to ensure cookie is sent
-            session.modified = True  # Force Flask to send the session cookie
+            session['logged_in'] = True
+            session.modified = True
             print(f"User {username} logged in successfully")
             print(f"current_user.is_authenticated: {current_user.is_authenticated}")
             print(f"current_user: {current_user}")
@@ -151,20 +148,16 @@ def logout():
 def handle_message(data):
     user_message = data['message']
 
-    # Save user message to database
     chat_message = ChatMessage(content=user_message, is_user=True, user_id=current_user.id)
     db.session.add(chat_message)
     db.session.commit()
 
-    # Get chatbot response
     bot_response = get_chatbot_response(user_message)
 
-    # Save bot response to database
     bot_message = ChatMessage(content=bot_response, is_user=False, user_id=current_user.id)
     db.session.add(bot_message)
     db.session.commit()
 
-    # Emit the response back to the client
     emit('receive_message', {'message': bot_response, 'is_user': False, 'message_id': bot_message.id})
 
 @socketio.on('reset_conversation')
@@ -280,16 +273,44 @@ def admin():
         flash('You do not have permission to access this page.', 'error')
         return redirect(url_for('index'))
     
-    users = User.query.all()
+    search_query = request.args.get('search', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+
+    user_query = User.query
+    if search_query:
+        user_query = user_query.filter(User.username.ilike(f'%{search_query}%') | User.email.ilike(f'%{search_query}%'))
+
+    users_pagination = user_query.paginate(page=page, per_page=per_page, error_out=False)
+    users = users_pagination.items
+
     user_data = []
     for user in users:
-        chat_messages = ChatMessage.query.filter_by(user_id=user.id).order_by(ChatMessage.timestamp).all()
+        chat_messages = ChatMessage.query.filter_by(user_id=user.id).order_by(ChatMessage.timestamp.desc()).limit(10).all()
+        
+        total_messages = ChatMessage.query.filter_by(user_id=user.id, is_user=False).count()
+        positive_feedback = ChatMessage.query.filter_by(user_id=user.id, is_user=False, feedback=True).count()
+        negative_feedback = ChatMessage.query.filter_by(user_id=user.id, is_user=False, feedback=False).count()
+        
         user_data.append({
             'user': user,
-            'chat_history': chat_messages
+            'chat_history': chat_messages,
+            'total_messages': total_messages,
+            'positive_feedback': positive_feedback,
+            'negative_feedback': negative_feedback
         })
-    
-    return render_template('admin.html', user_data=user_data)
+
+    total_users = User.query.count()
+    total_messages = ChatMessage.query.count()
+    avg_messages_per_user = db.session.query(func.avg(func.count(ChatMessage.id))).group_by(ChatMessage.user_id).scalar() or 0
+
+    return render_template('admin.html', 
+                           user_data=user_data, 
+                           users_pagination=users_pagination,
+                           total_users=total_users,
+                           total_messages=total_messages,
+                           avg_messages_per_user=avg_messages_per_user,
+                           search_query=search_query)
 
 if __name__ == '__main__':
     with app.app_context():
