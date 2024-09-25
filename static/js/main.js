@@ -26,20 +26,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const messageId = `msg-${messageCounter++}`;
         messageDiv.setAttribute('id', messageId);
         
-        if (!isUser) {
-            const feedbackDiv = document.createElement('div');
-            feedbackDiv.classList.add('message-feedback');
-            feedbackDiv.innerHTML = `
-                <button class="feedback-btn like" data-message-id="${messageId}">
-                    <i data-feather="thumbs-up"></i>
-                </button>
-                <button class="feedback-btn dislike" data-message-id="${messageId}">
-                    <i data-feather="thumbs-down"></i>
-                </button>
-            `;
-            messageDiv.appendChild(feedbackDiv);
-            feather.replace();
-        }
+        const feedbackDiv = document.createElement('div');
+        feedbackDiv.classList.add('message-feedback');
+        feedbackDiv.innerHTML = `
+            <button class="feedback-btn like" data-message-id="${messageId}">
+                <i data-feather="thumbs-up"></i>
+            </button>
+            <button class="feedback-btn dislike" data-message-id="${messageId}">
+                <i data-feather="thumbs-down"></i>
+            </button>
+        `;
+        messageDiv.appendChild(feedbackDiv);
         
         chatMessages.appendChild(messageDiv);
         scrollToBottom();
@@ -50,6 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
             messageDiv.style.opacity = '1';
             messageDiv.style.transform = 'translateY(0)';
         }, 50);
+
+        feather.replace();
     }
 
     function scrollToBottom() {
@@ -147,7 +146,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Load chat history
     fetch('/history')
         .then(response => response.json())
         .then(history => {
@@ -157,20 +155,16 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error loading chat history:', error);
         });
 
-    // Handle feedback clicks
     document.addEventListener('click', function(e) {
         if (e.target.closest('.feedback-btn')) {
             const button = e.target.closest('.feedback-btn');
             const messageId = button.getAttribute('data-message-id');
             const isLike = button.classList.contains('like');
             
-            // Remove active class from both buttons
             button.parentNode.querySelectorAll('.feedback-btn').forEach(btn => btn.classList.remove('active'));
             
-            // Add active class to clicked button
             button.classList.add('active');
             
-            // Send feedback to server
             fetch('/feedback', {
                 method: 'POST',
                 headers: {
