@@ -5,7 +5,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from models import db, ChatMessage, User
-from chatbot import initialize_conversation, get_chatbot_response, reset_conversation, upload_pdf
+from chatbot import initialize_conversation, get_chatbot_response, reset_conversation, upload_pdf, get_vector_store_id
 from datetime import timedelta
 from flask_socketio import SocketIO, emit
 
@@ -174,28 +174,35 @@ def handle_reset():
 def upload_file():
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
-    
+
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
-    
+
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
+
+        # Asegúrate de que el directorio de subida existe
+        if not os.path.exists(app.config['UPLOAD_FOLDER']):
+            os.makedirs(app.config['UPLOAD_FOLDER'])
+
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
         file_url = f"/uploads/{filename}"
-        
-        # Upload PDF to OpenAI Assistant
+
+        # Subir PDF al asistente de OpenAI
         if filename.lower().endswith('.pdf'):
-            upload_pdf(file_path)
-        
-        # Save file message to database
+            file.stream.seek(0)  # Reinicia el puntero del archivo
+            vector_store_id = get_vector_store_id()
+            upload_pdf(file_url, vector_store_id)
+
+        # Guardar información del archivo en la base de datos
         file_message = ChatMessage(content=f"File uploaded: {file_url}", is_user=True, user_id=current_user.id)
         db.session.add(file_message)
         db.session.commit()
-        
+
         return jsonify({'message': 'File uploaded successfully', 'file_url': file_url})
-    
+
     return jsonify({'error': 'File type not allowed'}), 400
 
 @app.route('/uploads/<filename>')
