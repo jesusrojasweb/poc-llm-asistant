@@ -26,17 +26,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const messageId = `msg-${messageCounter++}`;
         messageDiv.setAttribute('id', messageId);
         
-        const feedbackDiv = document.createElement('div');
-        feedbackDiv.classList.add('message-feedback');
-        feedbackDiv.innerHTML = `
-            <button class="feedback-btn like" data-message-id="${messageId}">
-                <i data-feather="thumbs-up"></i>
-            </button>
-            <button class="feedback-btn dislike" data-message-id="${messageId}">
-                <i data-feather="thumbs-down"></i>
-            </button>
-        `;
-        messageDiv.appendChild(feedbackDiv);
+        if (!isUser) {  // Only add feedback buttons for bot messages
+            const feedbackDiv = document.createElement('div');
+            feedbackDiv.classList.add('message-feedback');
+            feedbackDiv.innerHTML = `
+                <button class="feedback-btn like" data-message-id="${messageId}">
+                    <i data-feather="thumbs-up"></i>
+                </button>
+                <button class="feedback-btn dislike" data-message-id="${messageId}">
+                    <i data-feather="thumbs-down"></i>
+                </button>
+            `;
+            messageDiv.appendChild(feedbackDiv);
+        }
         
         chatMessages.appendChild(messageDiv);
         scrollToBottom();
