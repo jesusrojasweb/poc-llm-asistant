@@ -401,68 +401,71 @@ body {
     margin-bottom: 20px;
 }
 
-.admin-search {
-    margin-bottom: 20px;
+.admin-content {
+    display: flex;
+    gap: 20px;
 }
 
-.admin-search input[type="text"] {
-    padding: 10px;
-    width: 70%;
-    border: none;
-    border-radius: 5px 0 0 5px;
-    background-color: #3a3a3a;
-    color: #ffffff;
-}
-
-.admin-search button {
-    padding: 10px 15px;
-    border: none;
-    background-color: #4CAF50;
-    color: white;
-    border-radius: 0 5px 5px 0;
-    cursor: pointer;
-}
-
-.user-section {
+.user-list, .chat-display {
+    flex: 1;
     background-color: #2a2a2a;
     padding: 15px;
     border-radius: 5px;
-    margin-bottom: 20px;
 }
 
-.user-stats {
-    display: flex;
-    justify-content: space-between;
+#user-search {
+    width: 100%;
+    padding: 10px;
     margin-bottom: 10px;
+    border: none;
+    border-radius: 5px;
+    background-color: #3a3a3a;
+    color: #ffffff;
 }
 
-.chat-history {
-    max-height: 300px;
+#user-list {
+    list-style-type: none;
+    padding: 0;
+}
+
+#user-list li {
+    padding: 10px;
+    border-bottom: 1px solid #3a3a3a;
+    cursor: pointer;
+}
+
+#user-list li:hover {
+    background-color: #3a3a3a;
+}
+
+#user-pagination {
+    margin-top: 10px;
+    text-align: center;
+}
+
+#chat-history {
+    max-height: 500px;
     overflow-y: auto;
-    border: 1px solid #3a3a3a;
+}
+
+.message {
+    margin-bottom: 10px;
     padding: 10px;
     border-radius: 5px;
 }
 
-.feedback-indicator {
-    margin-left: 10px;
-}
-
-.pagination {
-    text-align: center;
-    margin-top: 20px;
-}
-
-.pagination a, .pagination strong {
-    display: inline-block;
-    padding: 5px 10px;
-    margin: 0 5px;
+.user-message {
     background-color: #3a3a3a;
-    color: #ffffff;
-    text-decoration: none;
-    border-radius: 3px;
+    align-self: flex-end;
 }
 
-.pagination strong {
-    background-color: #4CAF50;
+.bot-message {
+    background-color: #4a4a4a;
+    align-self: flex-start;
+}
+
+@media (max-width: 768px) {
+    .admin-content {
+        flex-direction: column;
+    }
 }

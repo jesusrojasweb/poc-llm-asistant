@@ -273,44 +273,57 @@ def admin():
         flash('You do not have permission to access this page.', 'error')
         return redirect(url_for('index'))
     
-    search_query = request.args.get('search', '')
+    return render_template('admin.html')
+
+@app.route('/admin/users')
+@login_required
+def admin_users():
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+
     page = request.args.get('page', 1, type=int)
+    search = request.args.get('search', '')
     per_page = 10
 
     user_query = User.query
-    if search_query:
-        user_query = user_query.filter(User.username.ilike(f'%{search_query}%') | User.email.ilike(f'%{search_query}%'))
+    if search:
+        user_query = user_query.filter(User.username.ilike(f'%{search}%') | User.email.ilike(f'%{search}%'))
 
-    users_pagination = user_query.paginate(page=page, per_page=per_page, error_out=False)
-    users = users_pagination.items
-
-    user_data = []
-    for user in users:
-        chat_messages = ChatMessage.query.filter_by(user_id=user.id).order_by(ChatMessage.timestamp.desc()).limit(10).all()
-        
-        total_messages = ChatMessage.query.filter_by(user_id=user.id, is_user=False).count()
-        positive_feedback = ChatMessage.query.filter_by(user_id=user.id, is_user=False, feedback=True).count()
-        negative_feedback = ChatMessage.query.filter_by(user_id=user.id, is_user=False, feedback=False).count()
-        
-        user_data.append({
-            'user': user,
-            'chat_history': chat_messages,
-            'total_messages': total_messages,
-            'positive_feedback': positive_feedback,
-            'negative_feedback': negative_feedback
-        })
+    pagination = user_query.paginate(page=page, per_page=per_page, error_out=False)
+    users = pagination.items
 
     total_users = User.query.count()
     total_messages = ChatMessage.query.count()
     avg_messages_per_user = db.session.query(func.avg(func.count(ChatMessage.id))).group_by(ChatMessage.user_id).scalar() or 0
 
-    return render_template('admin.html', 
-                           user_data=user_data, 
-                           users_pagination=users_pagination,
-                           total_users=total_users,
-                           total_messages=total_messages,
-                           avg_messages_per_user=avg_messages_per_user,
-                           search_query=search_query)
+    return jsonify({
+        'users': [{'id': user.id, 'username': user.username} for user in users],
+        'total_pages': pagination.pages,
+        'statistics': {
+            'total_users': total_users,
+            'total_messages': total_messages,
+            'avg_messages_per_user': float(avg_messages_per_user)
+        }
+    })
+
+@app.route('/admin/user_chat_history/<int:user_id>')
+@login_required
+def admin_user_chat_history(user_id):
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    user = User.query.get_or_404(user_id)
+    chat_messages = ChatMessage.query.filter_by(user_id=user.id).order_by(ChatMessage.timestamp).all()
+
+    return jsonify({
+        'chat_history': [
+            {
+                'content': message.content,
+                'is_user': message.is_user,
+                'timestamp': message.timestamp.isoformat()
+            } for message in chat_messages
+        ]
+    })
 
 if __name__ == '__main__':
     with app.app_context():
