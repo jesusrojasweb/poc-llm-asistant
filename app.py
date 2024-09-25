@@ -1,6 +1,7 @@
 import os
 from flask import Flask, render_template, request, jsonify, send_from_directory, redirect, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
@@ -27,6 +28,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_NAME'] = 'my_session_cookie'
 
 db.init_app(app)
+migrate = Migrate(app, db)
 socketio = SocketIO(app)
 
 # Flask-Login configuration
@@ -160,7 +162,7 @@ def handle_message(data):
     db.session.commit()
     
     # Emit the response back to the client
-    emit('receive_message', {'message': bot_response, 'is_user': False})
+    emit('receive_message', {'message': bot_response, 'is_user': False, 'message_id': bot_message.id})
 
 @socketio.on('reset_conversation')
 def handle_reset():
@@ -254,20 +256,18 @@ def handle_feedback():
     message_id = data.get('message_id')
     is_like = data.get('is_like')
     
-    # Here you would typically update your database
-    # For now, we'll just print the feedback
-    print(f"Feedback received: Message ID: {message_id}, Like: {is_like}")
+    # Extract the numeric ID from the message_id string
+    numeric_id = int(message_id.split('-')[1])
     
-    return jsonify({"status": "success"})
-
-def init_db():
-    with app.app_context():
-        db.drop_all()  # Be careful with this in production!
-        db.create_all()
-        print("Database tables created.")
-
-# Uncomment the next line to initialize the database
-# init_db()
+    # Update the message in the database
+    message = ChatMessage.query.filter_by(id=numeric_id, user_id=current_user.id).first()
+    if message:
+        message.feedback = is_like
+        db.session.commit()
+        print(f"Feedback saved: Message ID: {numeric_id}, Like: {is_like}")
+        return jsonify({"status": "success"})
+    else:
+        return jsonify({"status": "error", "message": "Message not found"}), 404
 
 if __name__ == '__main__':
     with app.app_context():

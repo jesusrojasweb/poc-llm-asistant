@@ -15,25 +15,27 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    function addMessage(content, isUser, feedback = null) {
-        console.log(`Adding message: ${content}, isUser: ${isUser}`);
+    function addMessage(content, isUser, messageId = null, feedback = null) {
+        console.log(`Adding message: ${content}, isUser: ${isUser}, messageId: ${messageId}`);
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message');
         messageDiv.classList.add(isUser ? 'user-message' : 'bot-message');
         const html = converter.makeHtml(content);
         messageDiv.innerHTML = html;
         
-        const messageId = `msg-${messageCounter++}`;
-        messageDiv.setAttribute('id', messageId);
+        if (!messageId) {
+            messageId = `temp-${messageCounter++}`;
+        }
+        messageDiv.setAttribute('id', `msg-${messageId}`);
         
         if (!isUser) {
             const feedbackDiv = document.createElement('div');
             feedbackDiv.classList.add('message-feedback');
             feedbackDiv.innerHTML = `
-                <button class="feedback-btn like${feedback && feedback.is_like ? ' active' : ''}" data-message-id="${messageId}">
+                <button class="feedback-btn like${feedback === true ? ' active' : ''}" data-message-id="${messageId}">
                     <i data-feather="thumbs-up"></i>
                 </button>
-                <button class="feedback-btn dislike${feedback && feedback.is_like === false ? ' active' : ''}" data-message-id="${messageId}">
+                <button class="feedback-btn dislike${feedback === false ? ' active' : ''}" data-message-id="${messageId}">
                     <i data-feather="thumbs-down"></i>
                 </button>
             `;
@@ -83,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('receive_message', (data) => {
         console.log('Received message:', data);
         hideTypingIndicator();
-        addMessage(data.message, data.is_user);
+        addMessage(data.message, data.is_user, data.message_id);
     });
 
     socket.on('conversation_reset', () => {
@@ -151,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetch('/history')
         .then(response => response.json())
         .then(history => {
-            history.forEach(msg => addMessage(msg.content, msg.is_user, msg.feedback));
+            history.forEach(msg => addMessage(msg.content, msg.is_user, msg.message_id, msg.feedback));
         })
         .catch(error => {
             console.error('Error loading chat history:', error);
