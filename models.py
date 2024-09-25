@@ -20,3 +20,4 @@ class ChatMessage(db.Model):
     is_user = Column(Boolean, default=False)
     user_id = Column(Integer, ForeignKey('user.id'))
     feedback = Column(Boolean, nullable=True)  # New column for feedback
+    there_is_feedback = Column(Boolean, nullable=True)  # New column for feedback

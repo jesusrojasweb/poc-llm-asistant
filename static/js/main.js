@@ -15,8 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    function addMessage(content, isUser, messageId = null, feedback = null) {
-        console.log(`Adding message: ${content}, isUser: ${isUser}, messageId: ${messageId}`);
+    function addMessage(content, isUser, messageId = null, feedback = null, thereIsFeedback) {
+        console.log(`Adding message: ${content}, isUser: ${isUser}, messageId: ${messageId}, feedback: ${feedback}, thereIsFeedback: ${thereIsFeedback}`);
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message');
         messageDiv.classList.add(isUser ? 'user-message' : 'bot-message');
@@ -32,10 +32,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const feedbackDiv = document.createElement('div');
             feedbackDiv.classList.add('message-feedback');
             feedbackDiv.innerHTML = `
-                <button class="feedback-btn like${feedback === true ? ' active' : ''}" data-message-id="${messageId}">
+                <button class="feedback-btn like${(feedback === true && thereIsFeedback) ? ' active' : ''}" data-message-id="${messageId}">
                     <i data-feather="thumbs-up"></i>
                 </button>
-                <button class="feedback-btn dislike${feedback === false ? ' active' : ''}" data-message-id="${messageId}">
+                <button class="feedback-btn dislike${(feedback === false && thereIsFeedback) ? ' active' : ''}" data-message-id="${messageId}">
                     <i data-feather="thumbs-down"></i>
                 </button>
             `;
@@ -153,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetch('/history')
         .then(response => response.json())
         .then(history => {
-            history.forEach(msg => addMessage(msg.content, msg.is_user, msg.message_id, msg.feedback));
+            history.forEach(msg => addMessage(msg.content, msg.is_user, msg.message_id, msg.feedback, msg.thereIsFeedback));
         })
         .catch(error => {
             console.error('Error loading chat history:', error);
