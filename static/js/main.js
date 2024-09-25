@@ -8,19 +8,40 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetButton = document.getElementById('resetButton');
     const typingIndicator = document.getElementById('typingIndicator');
     const converter = new showdown.Converter();
+    let messageCounter = 0;
 
     if (!chatMessages || !userInput || !sendButton || !fileInput || !resetButton || !typingIndicator) {
         console.log('One or more elements not found. User might not be logged in.');
         return;
     }
 
-    function addMessage(content, isUser) {
-        console.log(`Adding message: ${content}, isUser: ${isUser}`);
+    function addMessage(content, isUser, messageId = null, feedback = null, thereIsFeedback) {
+        console.log(`Adding message: ${content}, isUser: ${isUser}, messageId: ${messageId}, feedback: ${feedback}, thereIsFeedback: ${thereIsFeedback}`);
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message');
         messageDiv.classList.add(isUser ? 'user-message' : 'bot-message');
         const html = converter.makeHtml(content);
         messageDiv.innerHTML = html;
+        
+        if (!messageId) {
+            messageId = `temp-${messageCounter++}`;
+        }
+        messageDiv.setAttribute('id', `msg-${messageId}`);
+        
+        if (!isUser) {
+            const feedbackDiv = document.createElement('div');
+            feedbackDiv.classList.add('message-feedback');
+            feedbackDiv.innerHTML = `
+                <button class="feedback-btn like${(feedback === true && thereIsFeedback) ? ' active' : ''}" data-message-id="${messageId}">
+                    <i data-feather="thumbs-up"></i>
+                </button>
+                <button class="feedback-btn dislike${(feedback === false && thereIsFeedback) ? ' active' : ''}" data-message-id="${messageId}">
+                    <i data-feather="thumbs-down"></i>
+                </button>
+            `;
+            messageDiv.appendChild(feedbackDiv);
+        }
+        
         chatMessages.appendChild(messageDiv);
         scrollToBottom();
 
@@ -30,6 +51,8 @@ document.addEventListener('DOMContentLoaded', () => {
             messageDiv.style.opacity = '1';
             messageDiv.style.transform = 'translateY(0)';
         }, 50);
+
+        feather.replace();
     }
 
     function scrollToBottom() {
@@ -62,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('receive_message', (data) => {
         console.log('Received message:', data);
         hideTypingIndicator();
-        addMessage(data.message, data.is_user);
+        addMessage(data.message, data.is_user, data.message_id);
     });
 
     socket.on('conversation_reset', () => {
@@ -127,13 +150,44 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Load chat history
     fetch('/history')
         .then(response => response.json())
         .then(history => {
-            history.forEach(msg => addMessage(msg.content, msg.is_user));
+            history.forEach(msg => addMessage(msg.content, msg.is_user, msg.message_id, msg.feedback, msg.thereIsFeedback));
         })
         .catch(error => {
             console.error('Error loading chat history:', error);
         });
+
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.feedback-btn')) {
+            const button = e.target.closest('.feedback-btn');
+            const messageId = button.getAttribute('data-message-id');
+            const isLike = button.classList.contains('like');
+            
+            // Remove active class from both buttons
+            button.parentNode.querySelectorAll('.feedback-btn').forEach(btn => btn.classList.remove('active'));
+            
+            // Add active class to clicked button
+            button.classList.add('active');
+            
+            fetch('/feedback', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message_id: messageId,
+                    is_like: isLike
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Feedback sent successfully:', data);
+            })
+            .catch((error) => {
+                console.error('Error sending feedback:', error);
+            });
+        }
+    });
 });
