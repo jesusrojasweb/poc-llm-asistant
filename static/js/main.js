@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('fileInput');
     const resetButton = document.getElementById('resetButton');
     const typingIndicator = document.getElementById('typingIndicator');
+    const converter = new showdown.Converter();
 
     if (!chatMessages || !userInput || !sendButton || !fileInput || !resetButton || !typingIndicator) {
         console.log('One or more elements not found. User might not be logged in.');
@@ -18,7 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message');
         messageDiv.classList.add(isUser ? 'user-message' : 'bot-message');
-        messageDiv.textContent = content;
+        const html = converter.makeHtml(content);
+        messageDiv.innerHTML = html;
         chatMessages.appendChild(messageDiv);
         scrollToBottom();
 
@@ -66,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('conversation_reset', () => {
         console.log('Conversation reset');
         chatMessages.innerHTML = '';
-        addMessage("Conversation has been reset. How can I help you?", false);
+        addMessage("¡Hola! Soy tu compañero de estudios para los cursos de Mazda en Lapzo. Estoy aquí para ayudarte a resolver cualquier duda sobre el contenido de los cursos de manera rápida y clara. Si alguna pregunta es muy compleja, la escalaré a un instructor o administrador. ¡Comencemos!", false);
     });
 
     console.log('Attaching event listeners');
