@@ -163,8 +163,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const messageId = button.getAttribute('data-message-id');
             const isLike = button.classList.contains('like');
             
+            // Remove active class from both buttons
             button.parentNode.querySelectorAll('.feedback-btn').forEach(btn => btn.classList.remove('active'));
             
+            // Add active class to clicked button
             button.classList.add('active');
             
             fetch('/feedback', {
