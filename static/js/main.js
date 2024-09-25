@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    function addMessage(content, isUser) {
+    function addMessage(content, isUser, feedback = null) {
         console.log(`Adding message: ${content}, isUser: ${isUser}`);
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message');
@@ -26,14 +26,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const messageId = `msg-${messageCounter++}`;
         messageDiv.setAttribute('id', messageId);
         
-        if (!isUser) {  // Only add feedback buttons for bot messages
+        if (!isUser) {
             const feedbackDiv = document.createElement('div');
             feedbackDiv.classList.add('message-feedback');
             feedbackDiv.innerHTML = `
-                <button class="feedback-btn like" data-message-id="${messageId}">
+                <button class="feedback-btn like${feedback && feedback.is_like ? ' active' : ''}" data-message-id="${messageId}">
                     <i data-feather="thumbs-up"></i>
                 </button>
-                <button class="feedback-btn dislike" data-message-id="${messageId}">
+                <button class="feedback-btn dislike${feedback && feedback.is_like === false ? ' active' : ''}" data-message-id="${messageId}">
                     <i data-feather="thumbs-down"></i>
                 </button>
             `;
@@ -151,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetch('/history')
         .then(response => response.json())
         .then(history => {
-            history.forEach(msg => addMessage(msg.content, msg.is_user));
+            history.forEach(msg => addMessage(msg.content, msg.is_user, msg.feedback));
         })
         .catch(error => {
             console.error('Error loading chat history:', error);
