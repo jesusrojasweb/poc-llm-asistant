@@ -18,6 +18,7 @@ flask-login = "^0.6.3"
 flask-session = "^0.8.0"
 flask-socketio = "^5.3.7"
 eventlet = "^0.37.0"
+flask-migrate = "^4.0.7"
 
 
 [build-system]
