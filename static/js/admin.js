@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(data => {
                 hideLoadingIndicator();
                 displayChatHistory(data.chat_history);
+                displayChatStats(data.stats);
             });
     }
 
@@ -65,10 +66,31 @@ document.addEventListener('DOMContentLoaded', () => {
         history.forEach(message => {
             const div = document.createElement('div');
             div.classList.add('message', message.is_user ? 'user-message' : 'bot-message');
-            div.textContent = message.content;
+            div.innerHTML = `
+                <p>${message.content}</p>
+                <small>${new Date(message.timestamp).toLocaleString()}</small>
+                <span class="feedback">${getFeedbackIcon(message.feedback)}</span>
+            `;
             chatHistory.appendChild(div);
         });
         smoothScrollToBottom(chatHistory);
+    }
+
+    function getFeedbackIcon(feedback) {
+        if (feedback === true) return '👍';
+        if (feedback === false) return '👎';
+        return '';
+    }
+
+    function displayChatStats(stats) {
+        const statsDiv = document.createElement('div');
+        statsDiv.classList.add('chat-stats');
+        statsDiv.innerHTML = `
+            <p>Total Messages: ${stats.total_messages}</p>
+            <p>Likes: ${stats.likes_count}</p>
+            <p>Dislikes: ${stats.dislikes_count}</p>
+        `;
+        chatHistory.prepend(statsDiv);
     }
 
     function showLoadingIndicator() {
@@ -127,10 +149,15 @@ document.addEventListener('DOMContentLoaded', () => {
         new Chart(ctx, {
             type: 'pie',
             data: {
-                labels: ['User Messages', 'Bot Messages'],
+                labels: ['User Messages', 'Bot Messages', 'Likes', 'Dislikes'],
                 datasets: [{
-                    data: [data.user_messages, data.bot_messages],
-                    backgroundColor: ['rgba(255, 99, 132, 0.8)', 'rgba(54, 162, 235, 0.8)']
+                    data: [data.user_messages, data.bot_messages, data.likes, data.dislikes],
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.8)',
+                        'rgba(54, 162, 235, 0.8)',
+                        'rgba(75, 192, 192, 0.8)',
+                        'rgba(255, 206, 86, 0.8)'
+                    ]
                 }]
             },
             options: {

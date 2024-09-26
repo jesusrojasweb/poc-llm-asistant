@@ -328,9 +328,13 @@ def get_user_activity():
 def get_message_distribution():
     user_messages = ChatMessage.query.filter_by(is_user=True).count()
     bot_messages = ChatMessage.query.filter_by(is_user=False).count()
+    likes = ChatMessage.query.filter_by(feedback=True).count()
+    dislikes = ChatMessage.query.filter_by(feedback=False).count()
     return {
         'user_messages': user_messages,
-        'bot_messages': bot_messages
+        'bot_messages': bot_messages,
+        'likes': likes,
+        'dislikes': dislikes
     }
 
 @app.route('/admin/user_chat_history/<int:user_id>')
@@ -342,17 +346,39 @@ def admin_user_chat_history(user_id):
     user = User.query.get_or_404(user_id)
     chat_messages = ChatMessage.query.filter_by(user_id=user.id).order_by(ChatMessage.timestamp).all()
 
+    total_messages = len(chat_messages)
+    likes_count = sum(1 for msg in chat_messages if msg.feedback == True)
+    dislikes_count = sum(1 for msg in chat_messages if msg.feedback == False)
+
     return jsonify({
         'chat_history': [
             {
                 'content': message.content,
                 'is_user': message.is_user,
-                'timestamp': message.timestamp.isoformat()
+                'timestamp': message.timestamp.isoformat(),
+                'feedback': message.feedback
             } for message in chat_messages
-        ]
+        ],
+        'stats': {
+            'total_messages': total_messages,
+            'likes_count': likes_count,
+            'dislikes_count': dislikes_count
+        }
     })
+
+def create_admin_user():
+    with app.app_context():
+        admin_user = User.query.filter_by(is_admin=True).first()
+        if not admin_user:
+            admin_user = User(username='admin', email='admin@example.com', password_hash=generate_password_hash('admin_password'), is_admin=True)
+            db.session.add(admin_user)
+            db.session.commit()
+            print("Admin user created")
+        else:
+            print("Admin user already exists")
 
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        create_admin_user()
     socketio.run(app, host='0.0.0.0', port=5000, debug=False)
