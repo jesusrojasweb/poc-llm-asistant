@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 displayUsers(data.users);
                 updatePagination(data.total_pages, page);
                 updateStatistics(data.statistics);
+                updateCharts(data.chart_data);
             });
     }
 
@@ -89,6 +90,52 @@ document.addEventListener('DOMContentLoaded', () => {
         element.scrollTo({
             top: element.scrollHeight,
             behavior: 'smooth'
+        });
+    }
+
+    function updateCharts(chartData) {
+        updateUserActivityChart(chartData.user_activity);
+        updateMessageDistributionChart(chartData.message_distribution);
+    }
+
+    function updateUserActivityChart(data) {
+        const ctx = document.getElementById('userActivityChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'User Activity',
+                    data: data.values,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    function updateMessageDistributionChart(data) {
+        const ctx = document.getElementById('messageDistributionChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['User Messages', 'Bot Messages'],
+                datasets: [{
+                    data: [data.user_messages, data.bot_messages],
+                    backgroundColor: ['rgba(255, 99, 132, 0.8)', 'rgba(54, 162, 235, 0.8)']
+                }]
+            },
+            options: {
+                responsive: true
+            }
         });
     }
 

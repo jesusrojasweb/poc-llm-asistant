@@ -7,7 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from models import db, ChatMessage, User
 from chatbot import initialize_conversation, get_chatbot_response, reset_conversation, upload_pdf, get_vector_store_id
-from datetime import timedelta
+from datetime import timedelta, datetime
 from flask_socketio import SocketIO, emit
 from sqlalchemy import func
 
@@ -294,7 +294,10 @@ def admin_users():
 
     total_users = User.query.count()
     total_messages = ChatMessage.query.count()
-    avg_messages_per_user = db.session.query(func.avg(func.count(ChatMessage.id))).group_by(ChatMessage.user_id).scalar() or 0
+    avg_messages_per_user = db.session.query(func.avg(db.session.query(func.count(ChatMessage.id)).filter(ChatMessage.user_id == User.id).scalar_subquery())).scalar() or 0
+
+    user_activity = get_user_activity()
+    message_distribution = get_message_distribution()
 
     return jsonify({
         'users': [{'id': user.id, 'username': user.username} for user in users],
@@ -303,8 +306,32 @@ def admin_users():
             'total_users': total_users,
             'total_messages': total_messages,
             'avg_messages_per_user': float(avg_messages_per_user)
+        },
+        'chart_data': {
+            'user_activity': user_activity,
+            'message_distribution': message_distribution
         }
     })
+
+def get_user_activity():
+    last_week = datetime.utcnow() - timedelta(days=7)
+    activity = db.session.query(
+        func.date(ChatMessage.timestamp).label('date'),
+        func.count(ChatMessage.id).label('count')
+    ).filter(ChatMessage.timestamp >= last_week).group_by(func.date(ChatMessage.timestamp)).all()
+
+    return {
+        'labels': [str(day.date) for day in activity],
+        'values': [day.count for day in activity]
+    }
+
+def get_message_distribution():
+    user_messages = ChatMessage.query.filter_by(is_user=True).count()
+    bot_messages = ChatMessage.query.filter_by(is_user=False).count()
+    return {
+        'user_messages': user_messages,
+        'bot_messages': bot_messages
+    }
 
 @app.route('/admin/user_chat_history/<int:user_id>')
 @login_required

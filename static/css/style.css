@@ -418,6 +418,20 @@ body {
     margin-bottom: 10px;
 }
 
+.admin-charts {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.chart-container {
+    background-color: #2a2a2a;
+    padding: 15px;
+    border-radius: 5px;
+    flex: 1;
+    margin: 0 10px;
+}
+
 .admin-content {
     display: flex;
     gap: 20px;
@@ -505,11 +519,11 @@ body {
 }
 
 @media (max-width: 768px) {
-    .admin-stats, .admin-content {
+    .admin-stats, .admin-charts, .admin-content {
         flex-direction: column;
     }
     
-    .stat-item {
+    .stat-item, .chart-container {
         margin: 10px 0;
     }
 }
