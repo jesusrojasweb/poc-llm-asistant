@@ -50,9 +50,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function fetchUserChatHistory(userId) {
+        showLoadingIndicator();
         fetch(`/admin/user_chat_history/${userId}`)
             .then(response => response.json())
-            .then(data => displayChatHistory(data.chat_history));
+            .then(data => {
+                hideLoadingIndicator();
+                displayChatHistory(data.chat_history);
+            });
     }
 
     function displayChatHistory(history) {
@@ -62,6 +66,29 @@ document.addEventListener('DOMContentLoaded', () => {
             div.classList.add('message', message.is_user ? 'user-message' : 'bot-message');
             div.textContent = message.content;
             chatHistory.appendChild(div);
+        });
+        smoothScrollToBottom(chatHistory);
+    }
+
+    function showLoadingIndicator() {
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.id = 'loading-indicator';
+        loadingIndicator.textContent = 'Loading...';
+        chatHistory.innerHTML = '';
+        chatHistory.appendChild(loadingIndicator);
+    }
+
+    function hideLoadingIndicator() {
+        const loadingIndicator = document.getElementById('loading-indicator');
+        if (loadingIndicator) {
+            loadingIndicator.remove();
+        }
+    }
+
+    function smoothScrollToBottom(element) {
+        element.scrollTo({
+            top: element.scrollHeight,
+            behavior: 'smooth'
         });
     }
 

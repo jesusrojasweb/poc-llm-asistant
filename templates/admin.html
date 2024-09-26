@@ -12,21 +12,29 @@
         <h1>Admin Dashboard</h1>
         <a href="{{ url_for('index') }}" class="back-button">Back to Chat</a>
 
-        <div class="admin-summary">
-            <h2>Overall Statistics</h2>
-            <p>Total Users: <span id="total-users"></span></p>
-            <p>Total Messages: <span id="total-messages"></span></p>
-            <p>Average Messages per User: <span id="avg-messages-per-user"></span></p>
+        <div class="admin-stats">
+            <div class="stat-item">
+                <h3>Total Users</h3>
+                <p id="total-users"></p>
+            </div>
+            <div class="stat-item">
+                <h3>Total Messages</h3>
+                <p id="total-messages"></p>
+            </div>
+            <div class="stat-item">
+                <h3>Avg. Messages/User</h3>
+                <p id="avg-messages-per-user"></p>
+            </div>
         </div>
 
         <div class="admin-content">
-            <div class="user-list">
+            <div class="user-list-container">
                 <h2>Users</h2>
                 <input type="text" id="user-search" placeholder="Search users...">
                 <ul id="user-list"></ul>
                 <div id="user-pagination"></div>
             </div>
-            <div class="chat-display">
+            <div class="chat-history-container">
                 <h2>Chat History</h2>
                 <div id="chat-history"></div>
             </div>
