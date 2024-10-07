@@ -293,7 +293,7 @@ def admin_users():
     users = pagination.items
 
     total_users = User.query.count()
-    total_messages = ChatMessage.query.count()
+    total_messages = ChatMessage.query.filter_by(is_user=True).count()
     avg_messages_per_user = db.session.query(func.avg(db.session.query(func.count(ChatMessage.id)).filter(ChatMessage.user_id == User.id).scalar_subquery())).scalar() or 0
 
     user_activity = get_user_activity()
@@ -328,8 +328,8 @@ def get_user_activity():
 def get_message_distribution():
     user_messages = ChatMessage.query.filter_by(is_user=True).count()
     bot_messages = ChatMessage.query.filter_by(is_user=False).count()
-    likes = ChatMessage.query.filter_by(feedback=True).count()
-    dislikes = ChatMessage.query.filter_by(feedback=False).count()
+    likes = ChatMessage.query.filter_by(feedback=True, there_is_feedback=True).count()
+    dislikes = ChatMessage.query.filter_by(feedback=False, there_is_feedback=True).count()
     return {
         'user_messages': user_messages,
         'bot_messages': bot_messages,
@@ -347,8 +347,10 @@ def admin_user_chat_history(user_id):
     chat_messages = ChatMessage.query.filter_by(user_id=user.id).order_by(ChatMessage.timestamp).all()
 
     total_messages = len(chat_messages)
-    likes_count = sum(1 for msg in chat_messages if msg.feedback == True)
-    dislikes_count = sum(1 for msg in chat_messages if msg.feedback == False)
+
+    # Solo cuenta likes y dislikes si there_is_feedback es True
+    likes_count = sum(1 for msg in chat_messages if msg.feedback == True and msg.there_is_feedback == True)
+    dislikes_count = sum(1 for msg in chat_messages if msg.feedback == False and msg.there_is_feedback == True)
 
     return jsonify({
         'chat_history': [
@@ -356,7 +358,8 @@ def admin_user_chat_history(user_id):
                 'content': message.content,
                 'is_user': message.is_user,
                 'timestamp': message.timestamp.isoformat(),
-                'feedback': message.feedback
+                # Solo muestra feedback si there_is_feedback es True, de lo contrario None
+                'feedback': message.feedback if message.there_is_feedback else None
             } for message in chat_messages
         ],
         'stats': {
