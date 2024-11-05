@@ -5,7 +5,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
-from models import db, ChatMessage, User
+from models import db, ChatMessage, User, Chat
 from chatbot import initialize_conversation, get_chatbot_response, reset_conversation, upload_pdf, get_vector_store_id
 from datetime import timedelta, datetime
 from flask_socketio import SocketIO, emit
@@ -40,6 +40,11 @@ login_manager.login_message_category = 'info'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+# Ruta de prueba
+@app.route('/test')
+def test_route():
+    return "Hola, Mundo! El servidor Flask está funcionando correctamente."
+
 UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -57,7 +62,8 @@ def make_session_permanent():
 def index():
     print(f"Accessing index route. User authenticated: {current_user.is_authenticated}")
     print(f"Current user: {current_user}")
-    messages = ChatMessage.query.filter_by(user_id=current_user.id).order_by(ChatMessage.timestamp).all()
+    active_chat = get_active_chat()
+    messages = ChatMessage.query.filter_by(chat_id=active_chat.id).order_by(ChatMessage.timestamp).all()
     initial_history = [{
         'role': 'user' if msg.is_user else 'assistant',
         'content': msg.content
@@ -147,25 +153,102 @@ def logout():
 @socketio.on('send_message')
 def handle_message(data):
     user_message = data['message']
+    active_chat = get_active_chat()
 
-    chat_message = ChatMessage(content=user_message, is_user=True, user_id=current_user.id)
+    chat_message = ChatMessage(content=user_message, is_user=True, user_id=current_user.id, chat_id=active_chat.id)
     db.session.add(chat_message)
     db.session.commit()
 
     bot_response = get_chatbot_response(user_message)
 
-    bot_message = ChatMessage(content=bot_response, is_user=False, user_id=current_user.id)
+    bot_message = ChatMessage(content=bot_response, is_user=False, user_id=current_user.id, chat_id=active_chat.id)
     db.session.add(bot_message)
     db.session.commit()
 
     emit('receive_message', {'message': bot_response, 'is_user': False, 'message_id': bot_message.id})
 
+@app.route('/chats')
+@login_required
+def list_chats():
+    chats = Chat.query.filter_by(user_id=current_user.id).order_by(Chat.created_at.desc()).all()
+    chat_list = [{'id': chat.id, 'title': chat.title, 'created_at': chat.created_at.isoformat()} for chat in chats]
+    return jsonify(chat_list)
+
+@app.route('/testChat')
+def testChat():
+    return render_template('test.html')
+
+@app.route('/chats/select', methods=['POST'])
+@login_required
+def select_chat():
+    data = request.json
+    chat_id = data.get('chat_id')
+    if not chat_id:
+        return jsonify({'error': 'No se proporcionó chat_id'}), 400
+
+    chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
+    if not chat:
+        return jsonify({'error': 'Chat no encontrado'}), 404
+
+    session['active_chat_id'] = chat.id
+    return jsonify({'status': 'success', 'chat_id': chat.id})
+
+
+@app.route('/chats/<int:chat_id>/messages')
+@login_required
+def get_chat_messages(chat_id):
+    chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
+    if not chat:
+        return jsonify({'error': 'Chat no encontrado'}), 404
+    messages = ChatMessage.query.filter_by(chat_id=chat.id).order_by(ChatMessage.timestamp).all()
+    history = [{
+        'content': msg.content,
+        'is_user': msg.is_user,
+        'feedback': msg.feedback,
+        'thereIsFeedback': msg.there_is_feedback,
+        'message_id': msg.id,
+    } for msg in messages]
+    return jsonify(history)
+
+@app.route('/chats/create', methods=['POST'])
+@login_required
+def create_new_chat():
+    title = request.json.get('title', 'Nuevo Chat')
+    new_chat = Chat(user_id=current_user.id, title=title)
+    db.session.add(new_chat)
+    db.session.commit()
+    session['active_chat_id'] = new_chat.id
+    return jsonify({'status': 'success', 'chat_id': new_chat.id})
+
 @socketio.on('reset_conversation')
 def handle_reset():
-    reset_conversation()
-    ChatMessage.query.filter_by(user_id=current_user.id).delete()
+    # Crear un nuevo chat
+    new_chat = Chat(user_id=current_user.id, title='Nuevo Chat')
+    db.session.add(new_chat)
     db.session.commit()
+    # Asignar el nuevo chat como activo en la sesión
+    session['active_chat_id'] = new_chat.id
+    print(f"Socket.IO: Reset conversation, created new chat with ID {new_chat.id}")
+    # Reiniciar la conversación en el chatbot
+    reset_conversation()
     emit('conversation_reset')
+    
+@socketio.on('join_chat')
+def handle_join_chat(data):
+    chat_id = data.get('chat_id')
+    if chat_id:
+        chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
+        if chat:
+            session['active_chat_id'] = chat.id
+            emit('joined_chat', {'chat_id': chat.id})
+            print(f"Socket.IO: Joined chat with ID {chat.id}")
+        else:
+            emit('error', {'message': 'Chat no encontrado'})
+            print(f"Socket.IO: Chat no encontrado para ID {chat_id}")
+    else:
+        emit('error', {'message': 'No se proporcionó chat_id'})
+        print("Socket.IO: No se proporcionó chat_id en join_chat")
+
 
 @app.route('/upload', methods=['POST'])
 @login_required
@@ -208,7 +291,8 @@ def uploaded_file(filename):
 @app.route('/history')
 @login_required
 def get_chat_history():
-    messages = ChatMessage.query.filter_by(user_id=current_user.id).order_by(ChatMessage.timestamp).all()
+    active_chat = get_active_chat()
+    messages = ChatMessage.query.filter_by(chat_id=active_chat.id).order_by(ChatMessage.timestamp).all()
     print(f"messages: {messages}")
     history = [{
         'content': msg.content,
@@ -324,6 +408,21 @@ def get_user_activity():
         'labels': [str(day.date) for day in activity],
         'values': [day.count for day in activity]
     }
+    
+def get_active_chat():
+    chat_id = session.get('active_chat_id')
+    if chat_id:
+        chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
+        if chat:
+            return chat
+    # Si no hay chat activo, crear uno nuevo
+    new_chat = Chat(user_id=current_user.id, title='Nuevo Chat')
+    db.session.add(new_chat)
+    db.session.commit()
+    session['active_chat_id'] = new_chat.id
+    print(f"Created new chat with ID {new_chat.id}")
+    return new_chat
+
 
 def get_message_distribution():
     user_messages = ChatMessage.query.filter_by(is_user=True).count()
@@ -381,7 +480,16 @@ def create_admin_user():
             print("Admin user already exists")
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-        create_admin_user()
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+    if __name__ == '__main__':
+        print("Iniciando la aplicación Flask...")
+        with app.app_context():
+            print("Contexto de la aplicación iniciado.")
+            create_admin_user()
+            print("Usuario admin verificado o creado.")
+        port = int(os.environ.get('PORT', 5000))
+        print(f"Starting server on port {port}...")
+    try:
+        socketio.run(app, host='0.0.0.0', port=port, debug=False)
+        print("Servidor Flask iniciado correctamente.")
+    except Exception as e:
+        print(f"Error al iniciar el servidor: {e}")

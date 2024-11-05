@@ -5,6 +5,7 @@ from flask import current_app
 
 from alembic import context
 
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
@@ -38,6 +39,7 @@ def get_engine_url():
 # target_metadata = mymodel.Base.metadata
 config.set_main_option('sqlalchemy.url', get_engine_url())
 target_db = current_app.extensions['migrate'].db
+print(f"Alembic está utilizando la URL de la base de datos: {target_db}")
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

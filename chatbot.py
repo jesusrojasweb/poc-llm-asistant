@@ -57,7 +57,7 @@ def initialize_assistant():
     vector_store = client.beta.vector_stores.create(name="PDF Knowledge Base")
 
     # Ruta de los archivos PDF a cargar
-    pdf_paths = ["pdf-test.pdf", "pdf-test-1.pdf", "pdf-test-2.pdf"]
+    pdf_paths = ["01-We-are-the-challengers-Capitulo-1.pdf","02-We-are-the-challengers-Capitulo-2.pdf", "03-We-are-the-challengers-Capitulo-3.pdf","04-Conoce-a-Mazda-Skyactiv.pdf"]
 
     # Preparar los archivos para subirlos al vector store
     file_streams = []

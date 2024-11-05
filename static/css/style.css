@@ -527,3 +527,43 @@ body {
         margin: 10px 0;
     }
 }
+
+.chat-sidebar {
+    width: 200px;
+    background-color: #2a2a2a;
+    padding: 15px;
+    border-radius: 5px;
+    margin-right: 20px;
+    overflow-y: auto;
+    height: 100%;
+}
+
+.chat-sidebar h2 {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.chat-sidebar ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.chat-sidebar li {
+    padding: 10px;
+    border-bottom: 1px solid #444;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.chat-sidebar li:hover {
+    background-color: #3a3a3a;
+}
+
+.chat-messages {
+    flex-grow: 1;
+}
+
+.active-chat {
+    background-color: #3a3a3a;
+    font-weight: bold;
+}
